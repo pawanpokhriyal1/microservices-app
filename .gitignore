@@ -1,0 +1,15 @@
+# Ignore ALL node_modules (recursive)
+**/node_modules/
+node_modules/
+Node_Modules/
+NODE_MODULES/
+/api-gateway/node_modules/
+/identity-service/node_modules/
+/media-service/node_modules/
+/post-service/node_modules/
+/search-service/node_modules/
+
+# Other common ignores
+.env
+*.log
+# package-lock.json
