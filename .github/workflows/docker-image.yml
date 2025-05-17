@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted  # This should be your self-hosted runner (could be on EC2 or elsewhere)
 
     steps:
       - name: Checkout code
@@ -18,15 +18,16 @@ jobs:
 
       - name: Install Docker Compose
         run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          # Using a more recent version of Docker Compose (v2.x)
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
           docker-compose --version
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ secrets.DOCKERUSERNAME }}
+          password: ${{ secrets.DOCKERPASSWORD }}
 
       - name: Build and push Docker images
         run: |
@@ -35,7 +36,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # This could also be self-hosted if you prefer
 
     steps:
       - name: Checkout code
@@ -44,35 +45,48 @@ jobs:
       - name: Add EC2 SSH host key to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H 62.72.30.37 >> ~/.ssh/known_hosts
+          # Replace with your EC2 instance's public IP or DNS
+          ssh-keyscan -H 172.31.1.114 >> ~/.ssh/known_hosts
 
       - name: Set up SSH key for authentication
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          # Ensure your EC2 SSH private key is stored in GitHub secrets as EC2_SSH_PRIVATE_KEY
+          echo "${{ secrets.ECSSHPRIVATEKEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
       - name: SSH into EC2 and deploy
         uses: appleboy/ssh-action@v0.1.5
         with:
-          host: 62.72.30.37
-          username: root
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          host: 65.2.4.104  # Replace with your EC2 instance's public IP or DNS
+          username: ec2-user  # Default username for Amazon Linux EC2 instances
+          # For Ubuntu instances, use 'ubuntu' instead
+          key: ${{ secrets.ECSSHPRIVATEKEY }}
           port: 22
           script: |
-            cd /home/root/projects/nodejsfullcourse/NodeJS-Microservices
-            git pull origin master
-            echo "${{ secrets.IDENTITY_SERVICE_ENV }}" > ./identity-service/.env
-            echo "${{ secrets.POST_SERVICE_ENV }}" > ./post-service/.env
-            echo "${{ secrets.MEDIA_SERVICE_ENV }}" > ./media-service/.env
-            echo "${{ secrets.SEARCH_SERVICE_ENV }}" > ./search-service/.env
-            echo "${{ secrets.API_GATEWAY_ENV }}" > ./api-gateway/.env
+            # Navigate to your project directory on EC2
+            cd /path/to/your/project/on/ec2  # Update this path
+            
+            # Pull the latest code (consider using main instead of master if that's your branch)
+            git pull origin main
+            
+            # Write environment variables from GitHub secrets to respective .env files
+            # These secrets should contain the complete environment variables for each service
+            echo "${{ secrets.IDENTITYSERVICEENV }}" > ./identity-service/.env
+            echo "${{ secrets.POSTSERVICE }}" > ./post-service/.env
+            echo "${{ secrets.MEDIASERVICE }}" > ./media-service/.env
+            echo "${{ secrets.SEARCHSERVICE }}" > ./search-service/.env
+            echo "${{ secrets.APIGATEWAY }}" > ./api-gateway/.env
+            
+            # Stop and start containers with the new images
+            # Consider using docker-compose pull first if you're using pre-built images
             docker-compose down
             docker-compose up -d
             
-            
+            # Optional: Clean up unused images to save space
+            docker image prune -af
 
       - name: Debug SSH connection (optional)
         run: |
-          ssh -v -i ~/.ssh/id_rsa root@62.72.30.37 "echo 'SSH connection successful'"
+          ssh -v -i ~/.ssh/id_rsa 172.31.1.114 "echo 'SSH connection successful'"
         continue-on-error: true
