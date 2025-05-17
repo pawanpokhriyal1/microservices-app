@@ -8,4 +8,5 @@ const validateCreatePost=(data)=>{
     return schema.validate(data,{abortEarly:false});
 }
 
+
 module.exports={validateCreatePost};
